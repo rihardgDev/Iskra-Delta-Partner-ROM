@@ -7,6 +7,8 @@ This folder contains three different OS ROMS, for 1FG, WFG models of the compute
 # unknown ROMs
 This folder contains presumably the character ROMS, but this is still unconfirmed if you know more about it please let me know.
 
+OS ROMs have also been dissasembled and the code has been commented (in slovene).
+
 
 # Special thanks
 I would like to specially thank Miha Grčar and  Tomaž Štih for the information and help.
