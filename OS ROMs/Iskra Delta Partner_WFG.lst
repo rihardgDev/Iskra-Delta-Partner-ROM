@@ -1,0 +1,1196 @@
+; Partner WF/G ROM disassembly (delo v izdelavi)
+; Matej Horvat
+
+; ----------------------------------------
+
+0000	SEEK	$0
+0000	ORG	$0
+
+; ----------------------------------------
+
+0000	JP	Zacetek
+
+; ----------------------------------------
+
+; Ukazna vrstica, kjer uporabnik lahko izbere zagon z diskete
+; ali s trdega diska.
+
+;;UkaznaVrstica:
+0003	LD	SP,#FFC0
+0006	CALL	PrelomVrstice
+0009	LD	A,#2A	; '*'
+000B	CALL	GDPUkaz
+000E	CALL	BeriInIzpisiZnak
+0011	AND	#DF	; Pretvori v uppercase
+0013	CP	#41	; 'A'
+0015	JP	Z,HDBootSkok
+0018	CP	#46	; 'F'
+001A	JP	Z,FDBootSkok
+;;NeznanUkaz:
+001D	LD	A,#3F	; '?'
+001F	CALL	GDPUkaz
+0022	JR	UkaznaVrstica
+
+; ----------------------------------------
+
+; Nerabljeni nicxelni bajti oz. NOP-i.
+
+0024	DS	66, $00
+
+; ----------------------------------------
+
+; Nerabljen skok.
+
+0066	JP	NeznanUkaz
+
+; ----------------------------------------
+
+; Nerabljene procedure za izpis sxestnajstisxkih sxtevil.
+
+;;IzpisiHex16:
+0069	CALL	PrelomVrstice
+006C	LD	A,H
+006D	CALL	IzpisiHex8
+0070	LD	A,L
+0071	CALL	IzpisiHex8
+0074	LD	A,#20	; ' '
+0076	JP	GDPUkaz
+;;IzpisiHex8:
+0079	PUSH	BC
+007A	LD	B,A
+007B	SRA	A
+007D	SRA	A
+007F	SRA	A
+0081	SRA	A
+0083	AND	#0F
+0085	CALL	IzpisiHex4
+0088	LD	A,B
+0089	AND	#0F
+008B	CALL	IzpisiHex4
+008E	POP	BC
+008F	RET
+;;IzpisiHex4:
+0090	CP	#0A
+0092	JP	M,#0099
+0095	ADD	A,#37
+0097	JR	#009B
+0099	ADD	A,#30
+009B	CALL	GDPUkaz
+009E	RET
+
+; ----------------------------------------
+
+; Pocxaka, da uporabnik pritisne tipko na tipkovnici,
+; nato izpisxe njen znak na GDP.
+
+;;BeriInIzpisiZnak:
+009F	IN	A,(#D9)
+00A1	BIT	0,A
+00A3	JR	Z,BeriInIzpisiZnak	; Cxakaj, da je znak na voljo.
+00A5	IN	A,(#D8)
+00A7	RES	7,A
+00A9	CP	#20
+00AB	RET	C	; Cxe je kontrolni znak, koncxamo.
+
+; ----------------------------------------
+
+; Posxlje ukaz na GDP.
+
+;;GDPUkaz:
+00AC	CALL	CakajGDP
+00AF	OUT	(#20),A
+00B1	RET
+
+; ----------------------------------------
+
+; Pocxaka, da GDP koncxa izvajanje morebitnega ukaza.
+
+;;CakajGDP:
+00B2	PUSH	AF
+00B3	IN	A,(#20)
+00B5	AND	#04
+00B7	JR	Z,#00B3
+00B9	POP	AF
+00BA	RET
+
+; ----------------------------------------
+
+; Nerabljena procedura, ki izpisxe presledek na GDP.
+
+;;IzpisiPresledek:
+00BB	LD	A,#20
+00BD	JR	GDPUkaz
+
+; ----------------------------------------
+
+; Izvede prelom vrstice.
+
+; Pomaknemo vsebino zaslona 12 pikslov navzgor.
+;;PrelomVrstice:
+00BF	CALL	CakajGDP
+00C2	LD	A,(Scroll)
+00C5	SUB	#0C
+00C7	LD	(Scroll),A
+00CA	OUT	(#36),A
+00CC	PUSH	HL
+; Izbrisxemo novo vrstico.
+00CD	LD	HL,#00DE
+00D0	CALL	IzpisiNiz
+; Premaknemo pero na levo.
+00D3	LD	HL,#00F3
+00D6	CALL	IzpisiNiz
+00D9	POP	HL
+; Izberemo nacxin risanja.
+00DA	XOR	A
+00DB	JP	GDPUkaz
+
+; ----------------------------------------
+
+; Niz ukazov za GDP, ki premakne pero v spodnji levi kot in pobrisxe vrstico.
+
+00DE	DB	$03, $00, $05, $01, $0B, $0B, $0B, $0B
+00E6	DB	$0B, $0B, $0B, $0B, $0B, $0B, $0B, $0B
+00EE	DB	$0B, $0B, $0B, $0B, $00
+
+; ----------------------------------------
+
+; Niz ukazov za GDP, ki premakne pero na skrajno levo.
+
+00F3	DB	$21, $00, $0D, $00
+
+; ----------------------------------------
+
+; Vstopna tocxka v memory test.
+
+;;MemoryTest:
+00F7	LD	HL,#02D1
+00FA	CALL	IzpisiPrelomInNiz
+00FD	LD	HL,#2000
+0100	LD	BC,#FF80
+0103	LD	D,#02
+0105	LD	A,#00
+0107	PUSH	DE
+0108	PUSH	AF
+0109	CALL	#0114
+010C	POP	AF
+010D	POP	DE
+010E	ADD	A,#55
+0110	DEC	D
+0111	JR	NZ,#0107
+0113	RET
+
+; ----------------------------------------
+
+0114	CALL	#0125
+0117	OUT	(#90),A
+0119	CALL	#0125
+011C	CALL	#0138
+011F	OUT	(#88),A
+0121	CALL	#0138
+0124	RET
+
+; ----------------------------------------
+
+0125	PUSH	AF
+0126	PUSH	HL
+0127	LD	D,A
+0128	CPL
+0129	LD	E,A
+012A	LD	(HL),D
+012B	INC	HL
+012C	LD	(HL),E
+012D	INC	HL
+012E	PUSH	HL
+012F	OR	A
+0130	SBC	HL,BC
+0132	POP	HL
+0133	JR	C,#012A
+0135	POP	HL
+0136	POP	AF
+0137	RET
+
+; ----------------------------------------
+
+0138	PUSH	HL
+0139	PUSH	AF
+013A	LD	D,A
+013B	CPL
+013C	LD	E,A
+013D	LD	A,(HL)
+013E	CP	D
+013F	JR	NZ,#0151
+0141	INC	HL
+0142	LD	A,(HL)
+0143	CP	E
+0144	JR	NZ,#0151
+0146	INC	HL
+0147	PUSH	HL
+0148	OR	A
+0149	SBC	HL,BC
+014B	POP	HL
+014C	JR	C,#013D
+014E	POP	AF
+014F	POP	HL
+0150	RET
+0151	LD	HL,#015A
+0154	CALL	IzpisiPrelomInNiz
+0157	JP	UkaznaVrstica
+
+; ----------------------------------------
+
+; Sporocxilo o neuspelem memory testu.
+
+015A	DB	$21, $00
+015C	DZ	"MEMORY ERROR !!!"
+
+; ----------------------------------------
+
+;;Zacetek:
+016D	LD	SP,#FFC0
+
+; Inicializacija PIO
+0170	LD	A,#07
+0172	OUT	(#31),A
+0174	OUT	(#33),A
+0176	LD	A,#0F
+0178	OUT	(#31),A
+017A	OUT	(#33),A
+
+017C	LD	A,#18
+017E	OUT	(#30),A
+0180	LD	A,#6D
+0182	OUT	(#32),A
+0184	XOR	A
+0185	OUT	(#39),A
+0187	OUT	(#36),A
+0189	LD	(Scroll),A
+
+; (odvecx)
+018C	XOR	A
+018D	OUT	(#21),A
+
+; Izbira in spust GDP peresa
+018F	LD	A,#03
+0191	OUT	(#21),A
+
+0193	LD	A,#04	; Pocxistimo GDP sliko...
+0195	CALL	GDPUkaz
+0198	LD	A,#05	; ... in postavimo pero na levi rob.
+019A	CALL	GDPUkaz
+
+019D	XOR	A
+019E	OUT	(#39),A
+01A0	OUT	(#30),A
+
+01A2	CALL	AVDCInit1
+01A5	CALL	AVDCInit2
+
+; Inicializacija SIO "CRT" kanala (za tipkovnico)
+01A8	LD	C,#D9
+01AA	LD	HL,#02B6
+01AD	LD	B,#07
+01AF	OTIR
+
+; Inicializacija SIO "LPT" kanala
+01B1	LD	C,#DB
+01B3	LD	HL,#02B6
+01B6	LD	B,#07
+01B8	OTIR
+
+; Inicializacija SIO "VAX" kanala
+01BA	LD	C,#E1
+01BC	LD	HL,#02B6
+01BF	LD	B,#07
+01C1	OTIR
+
+01C3	LD	SP,#FFC0
+
+; Y koordinata GDP peresa := 100
+01C6	LD	A,#64
+01C8	OUT	(#2B),A
+
+01CA	LD	HL,#02BD
+01CD	CALL	IzpisiPrelomInNiz
+
+; Spet postavimo pero na levi rob.
+01D0	LD	A,#05
+01D2	CALL	GDPUkaz
+
+01D5	LD	HL,#022D
+01D8	CALL	IzpisiPrelomInNiz
+
+01DB	CALL	MemoryTest
+
+01DE	CALL	FDCInit
+
+01E1	CALL	#02EE
+
+01E4	IN	A,(#D9)
+01E6	AND	#01	; Je na voljo znak na tipkovnici?
+01E8	JP	Z,HDBootSkok
+01EB	CALL	BeriInIzpisiZnak
+01EE	CP	#03	; Je CTL+C?
+01F0	JP	NZ,HDBootSkok
+01F3	LD	HL,#01FC
+01F6	CALL	IzpisiPrelomInNiz
+01F9	JP	UkaznaVrstica
+
+; ----------------------------------------
+
+; Sporocxilo o prekinjenem zagonu.
+
+01FC	DB	$21, $00
+01FE	DZ	"Interrupted, press A or F to load the system !"
+
+; ----------------------------------------
+
+; Niz z verzijo programa.
+
+022D	DB	$21, $00
+022F	DZ	"[ Boot V 1.1 - WF ]"
+
+; ----------------------------------------
+
+;;IzpisiPrelomInNiz:
+0243	CALL	PrelomVrstice
+; (se nadaljuje v IzpisiNiz)
+
+; ----------------------------------------
+
+; Izpisxe niz na GDP.
+; Prvi bajt niza se zapisxe v GDP-jev register za velikost znakov,
+; drugi pa v kontrolni register 2. V praksi je drugi bajt vedno 0,
+; lahko bi pa bil 4 za lezxecxe besedilo.
+
+; Vhod:
+; HL -> niz, zakljucxen z 0
+
+; Unicxi A.
+
+;;IzpisiNiz:
+0246	CALL	CakajGDP
+0249	LD	A,(HL)
+024A	OUT	(#23),A
+024C	INC	HL
+024D	LD	A,(HL)
+024E	OUT	(#22),A
+0250	INC	HL
+0251	LD	A,(HL)
+0252	OR	A
+0253	RET	Z
+0254	CALL	GDPUkaz
+0257	INC	HL
+0258	JR	#0251
+
+; ----------------------------------------
+
+;;Zakasnitev:
+025A	PUSH	BC
+025B	LD	B,#FF
+025D	NOP
+025E	DJNZ	#025D
+0260	POP	BC
+0261	RET
+
+; ----------------------------------------
+
+;;AVDCInit1:
+0262	LD	A,#00
+0264	OUT	(#39),A
+0266	CALL	Zakasnitev
+0269	CALL	Zakasnitev
+026C	CALL	Zakasnitev
+026F	LD	HL,#02AC
+0272	XOR	A
+
+; SS1 := 0
+0273	OUT	(#3E),A
+0275	OUT	(#3F),A
+
+; SS2 := 0
+0277	OUT	(#3A),A
+0279	OUT	(#3B),A
+
+027B	LD	A,#10
+027D	OUT	(#39),A
+027F	LD	B,#0A
+0281	LD	C,#38
+0283	OTIR
+
+0285	RET
+
+; ----------------------------------------
+
+; Vkljucxi AVDC kurzor in ???
+;;AVDCInit2:
+0286	LD	A,#3D
+0288	OUT	(#39),A
+
+; Naslov AVDC kurzorja := 0
+028A	XOR	A
+028B	OUT	(#3D),A
+028D	OUT	(#3C),A
+
+028F	LD	HL,#1FFF
+0292	CALL	AVDCNastaviDispAddr
+
+; Zapolni AVDC framebuffer s presledki?
+0295	LD	A,#20
+0297	OUT	(#34),A
+0299	XOR	A
+029A	OUT	(#35),A
+029C	LD	A,#BB	; Write from cursor to pointer
+029E	OUT	(#39),A
+
+02A0	RET
+
+; ----------------------------------------
+
+; Nastavi AVDC inicializacijska registra 10 in 11
+; (display address register lower/upper).
+
+; Vhod:
+; HL = novi display address
+
+; Unicxi A.
+
+;;AVDCNastaviDispAddr:
+02A1	LD	A,#1A
+02A3	OUT	(#39),A
+02A5	LD	A,L
+02A6	OUT	(#38),A
+02A8	LD	A,H
+02A9	OUT	(#38),A
+02AB	RET
+
+; ----------------------------------------
+
+; Inicializacijski niz za AVDC.
+
+02AC	DB	$D0, $2F, $0D, $05, $99, $4F, $0A, $EA
+02B4	DB	$00, $30
+
+; ----------------------------------------
+
+; Inicializacijski niz za serijska vrata.
+
+02B6	DB	$18, $04, $44, $03, $C1, $05, $68
+
+; ----------------------------------------
+
+; Zagonsko sporocxilo.
+
+02BD	DB	$A8, $00
+02BF	DZ	"Delta Partner GDP"
+
+; ----------------------------------------
+
+; Sporocxilo o testiranju spomina.
+
+02D1	DB	$21, $00
+02D3	DZ	"TESTING MEMORY ... "
+
+; ----------------------------------------
+
+; Nerabljen bajt?
+
+02E7	DB	$00
+
+; ----------------------------------------
+
+; ???
+; To je v resnici IVT, ki kazxe tudi na FDC handler na 4CA
+
+02E8	DW	$04CA, $05D6, $0524
+
+; ----------------------------------------
+
+; Prazna funkcija; verjetno se je pogojno uporabljala med razvojem.
+
+02EE	RET
+
+; ----------------------------------------
+
+; Nerabljeno.
+
+02EF	NOP
+02F0	NOP
+
+; ----------------------------------------
+
+; Nerabljen skok.
+
+02F1	JP	#04CE
+
+; ----------------------------------------
+
+;;HDBootSkok:
+02F4	JP	HDBoot
+
+; ----------------------------------------
+
+; Nerabljen skok.
+
+02F7	JP	#05A7
+
+; ----------------------------------------
+
+;;FDBootSkok:
+02FA	JP	FDBoot
+
+; ----------------------------------------
+
+;;FDCInit:
+02FD	DI
+02FE	IM	2
+0300	LD	HL,#02E8
+0303	LD	A,L
+0304	OUT	(#E8),A
+0306	OUT	(#C8),A
+0308	LD	A,H
+0309	LD	I,A
+030B	EI
+030C	HALT
+030D	LD	A,#08
+030F	CALL	#0337
+0312	CALL	#0345
+0315	CALL	#0345
+0318	LD	A,#03
+031A	CALL	#0337
+031D	LD	A,#0D
+031F	AND	#0F
+0321	RLCA
+0322	RLCA
+0323	RLCA
+0324	RLCA
+0325	LD	B,A
+0326	LD	A,#0E
+0328	AND	#0F
+032A	OR	B
+032B	CALL	#0337
+032E	LD	A,#04
+0330	RLCA
+0331	AND	#FE
+0333	CALL	#0337
+0336	RET
+
+; ----------------------------------------
+
+0337	PUSH	AF
+0338	IN	A,(#F0)
+033A	AND	#C0
+033C	CP	#80
+033E	JP	NZ,#0338
+0341	POP	AF
+0342	OUT	(#F1),A
+0344	RET
+
+; ----------------------------------------
+
+0345	IN	A,(#F0)
+0347	AND	#C0
+0349	CP	#C0
+034B	JP	NZ,#0345
+034E	IN	A,(#F1)
+0350	RET
+
+; ----------------------------------------
+
+0351	LD	A,#07
+0353	CALL	#0337
+0356	LD	A,(Neznano1)
+0359	CALL	#0337
+035C	EI
+035D	HALT
+035E	LD	A,#08
+0360	CALL	#0337
+0363	CALL	#0345
+0366	CALL	#0345
+0369	XOR	A
+036A	LD	(Neznano2),A
+036D	LD	(Neznano6),A
+0370	RET
+
+; ----------------------------------------
+
+0371	CALL	#03ED
+0374	RET	NZ
+0375	LD	A,#0A
+0377	LD	(Neznano5),A
+037A	LD	A,#05
+037C	OUT	(#C0),A
+037E	LD	A,#CF
+0380	OUT	(#C0),A
+0382	CALL	#045C
+0385	LD	HL,#046E
+0388	OTIR
+038A	LD	A,#06
+038C	OR	#40
+038E	CALL	#042A
+0391	CALL	#0446
+0394	EI
+0395	HALT
+0396	JP	C,#03AB
+0399	IN	A,(#98)
+039B	AND	#01
+039D	JP	NZ,#0394
+03A0	LD	HL,#0529
+03A3	CALL	IzpisiPrelomInNiz
+03A6	OUT	(#98),A
+03A8	JP	#0394
+03AB	LD	A,#03
+03AD	OUT	(#CA),A
+03AF	CALL	#0345
+03B2	CALL	#0345
+03B5	PUSH	AF
+03B6	LD	B,#05
+03B8	CALL	#0345
+03BB	DEC	B
+03BC	JP	NZ,#03B8
+03BF	POP	AF
+03C0	CP	#80
+03C2	RET	Z
+03C3	LD	A,(Neznano5)
+03C6	OR	A
+03C7	JP	Z,#03EB
+03CA	DEC	A
+03CB	LD	(Neznano5),A
+03CE	LD	A,(Neznano2)
+03D1	PUSH	AF
+03D2	INC	A
+03D3	LD	(Neznano2),A
+03D6	LD	A,(Neznano6)
+03D9	PUSH	AF
+03DA	CALL	#03ED
+03DD	POP	AF
+03DE	LD	(Neznano6),A
+03E1	POP	AF
+03E2	LD	(Neznano2),A
+03E5	CALL	#03ED
+03E8	JP	#037A
+03EB	INC	A
+03EC	RET
+
+; ----------------------------------------
+
+03ED	CALL	#0501
+03F0	LD	A,#0F
+03F2	CALL	#0337
+03F5	CALL	#041B
+03F8	CALL	#0337
+03FB	LD	A,(Neznano2)
+03FE	CALL	#0337
+0401	EI
+0402	HALT
+0403	LD	A,#08
+0405	CALL	#0337
+0408	CALL	#0345
+040B	CALL	#0345
+040E	LD	B,A
+040F	LD	A,(Neznano2)
+0412	CP	B
+0413	JP	Z,#0419
+0416	XOR	A
+0417	INC	A
+0418	RET
+0419	XOR	A
+041A	RET
+
+; ----------------------------------------
+
+041B	LD	A,(Neznano6)
+041E	RLCA
+041F	RLCA
+0420	AND	#04
+0422	PUSH	BC
+0423	LD	B,A
+0424	LD	A,(Neznano1)
+0427	OR	B
+0428	POP	BC
+0429	RET
+
+; ----------------------------------------
+
+042A	CALL	#0337
+042D	CALL	#041B
+0430	CALL	#0337
+0433	LD	A,(Neznano2)
+0436	CALL	#0337
+0439	LD	A,(Neznano6)
+043C	CALL	#0337
+043F	LD	A,(Neznano4)
+0442	CALL	#0337
+0445	RET
+
+; ----------------------------------------
+
+0446	LD	A,#01
+0448	CALL	#0337
+044B	LD	A,(Neznano4)
+044E	CALL	#0337
+0451	LD	A,#0A
+0453	CALL	#0337
+0456	LD	A,#FF
+0458	CALL	#0337
+045B	RET
+
+; ----------------------------------------
+
+045C	LD	A,#79
+045E	OUT	(#C0),A
+0460	LD	HL,(Neznano3)
+0463	LD	A,L
+0464	OUT	(#C0),A
+0466	LD	A,H
+0467	OUT	(#C0),A
+0469	LD	B,#0B
+046B	LD	C,#C0
+046D	RET
+
+; ----------------------------------------
+
+; Init string za FDC???
+
+046E	DB	$FF, $00, $14, $28, $85, $F1, $8A, $CF
+0476	DB	$01, $CF, $87, $FF, $00, $14, $28, $85
+047E	DB	$F1, $8A, $CF, $05, $CF, $87
+
+; ----------------------------------------
+
+;;FDNaloziCPMLDR:
+0484	LD	A,#13
+0486	LD	(Neznano7),A
+0489	XOR	A
+048A	LD	(Neznano1),A
+048D	CALL	#0351
+0490	LD	HL,#E000
+0493	LD	(Neznano3),HL
+0496	XOR	A
+0497	INC	A
+0498	LD	(Neznano4),A
+049B	CALL	#0371
+049E	JP	NZ,#06D1
+04A1	LD	DE,#0100
+04A4	LD	HL,(Neznano3)
+04A7	ADD	HL,DE
+04A8	LD	(Neznano3),HL
+04AB	LD	A,(Neznano4)
+04AE	INC	A
+04AF	LD	(Neznano4),A
+04B2	LD	HL,#FFD8
+04B5	CP	(HL)
+04B6	JP	NZ,#049B
+04B9	LD	A,(Neznano6)
+04BC	OR	A
+04BD	RET	NZ
+04BE	INC	A
+04BF	LD	(Neznano6),A
+04C2	LD	A,#0E
+04C4	LD	(Neznano7),A
+04C7	JP	#0496
+
+; ----------------------------------------
+
+;;FDCIntHandler:
+04CA	EI
+04CB	SCF
+04CC	RETI
+
+; ----------------------------------------
+
+; Sem skocxi procedura na 02F1, ki ni nikoli klicana, torej tudi
+; to ni nikoli klicano.
+
+04CE	CALL	FDNaloziCPMLDR
+04D1	JP	UkaznaVrstica
+
+; ----------------------------------------
+
+;;FDBoot:
+04D4	CALL	FDNaloziCPMLDR
+04D7	LD	A,(CPMLDR)	; Prvi bajt prvega sektorja...
+04DA	CP	#C3	; ... mora biti opcode za brezpogojni JP...
+04DC	JP	Z,#04EA
+04DF	CP	#31	; ... ali LD SP, nn
+04E1	JP	Z,#04EA
+04E4	LD	HL,#0593
+04E7	JP	Napaka
+
+; Nalagalnik OSa je nalozxen; skocximo vanj
+04EA	JP	Trampolin
+
+; ----------------------------------------
+
+04ED	IN	A,(#98)
+04EF	AND	#01
+04F1	RET
+
+; ----------------------------------------
+
+04F2	LD	A,#FF
+04F4	PUSH	BC
+04F5	LD	B,#FF
+04F7	DEC	B
+04F8	JP	NZ,#04F7
+04FB	DEC	A
+04FC	JP	NZ,#04F5
+04FF	POP	BC
+0500	RET
+
+; ----------------------------------------
+
+0501	CALL	#04ED
+0504	JP	NZ,#050C
+0507	OUT	(#98),A
+0509	CALL	#04F2
+050C	XOR	A
+050D	OUT	(#98),A
+050F	LD	A,#47
+0511	OUT	(#C8),A
+0513	OUT	(#C9),A
+0515	LD	A,#82
+0517	OUT	(#C8),A
+0519	OUT	(#C9),A
+051B	LD	A,#A7
+051D	OUT	(#CA),A
+051F	LD	A,#FF
+0521	OUT	(#CA),A
+0523	RET
+
+; ----------------------------------------
+
+;;NeznanIntHandler:
+0524	EI
+0525	SCF
+0526	CCF
+0527	RETI
+
+; ----------------------------------------
+
+; Sporocxilo, da disketni pogon ni pripravljen.
+
+0529	DB	$21, $00
+052B	DZ	"FLOPPY DISK NOT READY !!!!"
+
+; ----------------------------------------
+
+;;HDBoot:
+0546	CALL	HDNaloziCPMLDR
+0549	LD	A,(CPMLDR)	; Prvi bajt prvega sektorja...
+054C	CP	#31	; ... mora biti opcode za LD SP, nn
+054E	JP	Z,#0557
+0551	LD	HL,#0593
+0554	JP	Napaka
+
+; Kopiramo ROM na 2000h
+0557	LD	HL,#0000
+055A	LD	DE,#2000
+055D	LD	BC,#0800
+0560	LDIR
+
+; Kopiramo interrupt handler(?)
+0562	LD	HL,#0761
+0565	LD	DE,#C000
+0568	LD	BC,#006C
+056B	LDIR
+
+056D	DI
+056E	LD	A,#03
+0570	OUT	(#C8),A
+0572	OUT	(#C9),A
+0574	LD	HL,#C000
+0577	LD	A,H
+0578	LD	I,A
+057A	LD	A,L
+057B	OUT	(#E8),A
+057D	OUT	(#C8),A
+057F	LD	A,#47
+0581	OUT	(#C8),A
+0583	LD	A,#FF
+0585	OUT	(#C8),A
+0587	LD	A,#C7
+0589	OUT	(#C9),A
+058B	LD	A,#64
+058D	OUT	(#C9),A
+058F	EI
+
+; Nalagalnik OSa je nalozxen; skocximo vanj
+0590	JP	Trampolin
+
+; ----------------------------------------
+
+; Sporocxilo, da trdi disk ni zagonski.
+
+0593	DB	$21, $00
+0595	DZ	"NO SYSTEM ON DISK"
+
+; ----------------------------------------
+
+; Sem skocxi procedura na 02F7, ki ni nikoli klicana, torej tudi
+; to ni nikoli klicano.
+
+05A7	CALL	HDNaloziCPMLDR
+05AA	JP	UkaznaVrstica
+
+; ----------------------------------------
+
+05AD	XOR	A
+05AE	OUT	(#12),A
+05B0	DI
+05B1	LD	A,#47
+05B3	OUT	(#C8),A
+05B5	LD	A,#FF
+05B7	OUT	(#C8),A
+05B9	LD	A,#C7
+05BB	OUT	(#C9),A
+05BD	LD	A,#50
+05BF	OUT	(#C9),A
+05C1	EI
+05C2	CALL	#05FC
+05C5	LD	HL,#0755
+05C8	CALL	#063D
+05CB	CALL	#0662
+05CE	JP	NZ,#05C5
+05D1	LD	A,#03
+05D3	OUT	(#C9),A
+05D5	RET
+
+; ----------------------------------------
+
+;;CTCIntHandler:
+05D6	LD	A,#03
+05D8	OUT	(#C9),A
+05DA	CALL	IzvediRETI
+05DD	EI
+05DE	LD	HL,#05E6
+05E1	JP	Napaka
+
+; ----------------------------------------
+
+;;IzvediRETI:
+05E4	RETI
+
+; ----------------------------------------
+
+; Sporocxilo, da trdi disk ni pripravljen.
+
+05E6	DB	$21, $00
+05E8	DZ	"HARD DISK NOT READY"
+
+; ----------------------------------------
+
+05FC	LD	HL,#0747
+05FF	CALL	#0652
+0602	CALL	#0662
+0605	RET	Z
+0606	LD	A,#34
+0608	JP	#06D7
+
+; ----------------------------------------
+
+;;HDNaloziCPMLDR:
+060B	CALL	#05AD
+060E	LD	A,#C3
+0610	OUT	(#C0),A
+0612	LD	HL,#075B
+0615	CALL	#063D
+0618	IN	A,(#10)
+061A	AND	#40
+061C	JP	Z,#0618
+061F	IN	A,(#10)
+0621	AND	#10
+0623	JP	NZ,#0634
+0626	LD	A,#22
+0628	OUT	(#10),A
+062A	CALL	#06A9
+062D	IN	A,(#10)
+062F	AND	#10
+0631	JP	Z,#062D
+0634	CALL	#0662
+0637	RET	Z
+0638	LD	A,#32
+063A	JP	#06D7
+
+; ----------------------------------------
+
+063D	CALL	#067F
+0640	CALL	#069B
+0643	LD	B,A
+0644	AND	#10
+0646	RET	Z
+0647	LD	A,B
+0648	AND	#40
+064A	RET	NZ
+064B	LD	A,(HL)
+064C	OUT	(#11),A
+064E	INC	HL
+064F	JP	#0640
+
+; ----------------------------------------
+
+0652	CALL	#067F
+0655	CALL	#069B
+0658	AND	#40
+065A	RET	NZ
+065B	LD	A,(HL)
+065C	OUT	(#11),A
+065E	INC	HL
+065F	JP	#0655
+
+; ----------------------------------------
+
+0662	CALL	#069B
+0665	AND	#10
+0667	JP	NZ,#066F
+066A	LD	A,#42
+066C	JP	#06D7
+066F	IN	A,(#11)
+0671	LD	B,A
+0672	INC	HL
+0673	CALL	#069B
+0676	IN	A,(#11)
+0678	XOR	A
+0679	OUT	(#10),A
+067B	LD	A,B
+067C	AND	#03
+067E	RET
+
+; ----------------------------------------
+
+067F	IN	A,(#10)
+0681	AND	#08
+0683	JP	Z,#068B
+0686	LD	A,#41
+0688	JP	#06D7
+068B	LD	A,#01
+068D	OUT	(#10),A
+068F	IN	A,(#10)
+0691	AND	#08
+0693	JP	Z,#068F
+0696	LD	A,#02
+0698	OUT	(#10),A
+069A	RET
+
+; ----------------------------------------
+
+069B	IN	A,(#10)
+069D	RLA
+069E	JP	NC,#069B
+06A1	RRA
+06A2	RET
+
+; ----------------------------------------
+
+06A3	LD	HL,#06C2
+06A6	JP	#06AC
+
+; ----------------------------------------
+
+06A9	LD	HL,#06B3
+06AC	LD	C,#C0
+06AE	LD	B,#0F
+06B0	OTIR
+06B2	RET
+
+; ----------------------------------------
+
+; ??? init string za DMA
+
+06B3	DB	$79, $00, $E0, $FF, $1E, $14, $28, $95
+06BB	DB	$11, $00, $8A, $CF, $01, $CF, $87
+
+; ----------------------------------------
+
+; ??? init string za DMA
+
+06C2	DB	$79, $00, $E0, $FF, $1E, $14, $28, $95
+06CA	DB	$11, $00, $8A, $CF, $05, $CF, $87
+
+; ----------------------------------------
+
+06D1	LD	HL,#06E0
+06D4	JP	Napaka
+06D7	LD	HL,#0714
+;;Napaka:
+06DA	CALL	IzpisiPrelomInNiz
+06DD	JP	UkaznaVrstica
+
+; ----------------------------------------
+
+; Sporocxilo, da je nekaj narobe z disketnim pogonom.
+
+06E0	DB	$21, $00
+06E2	DZ	"FLOPPY DISK MALFUNCTION !!!RETRY WITH COMMAND  F "
+
+; ----------------------------------------
+
+; Sporocxilo, da je nekaj narobe s trdim diskom.
+
+0714	DB	$21, $00
+0716	DZ	"HARD DISK MALFUNCTION >>> RETRY WITH COMMAND  A "
+
+; ----------------------------------------
+
+; ???
+
+0747	DB	$0C, $00, $00, $00, $00, $00, $01, $32
+074F	DB	$04, $00, $80, $00, $40, $0B, $01, $00
+0757	DB	$00, $00, $00, $00, $08, $00, $00, $00
+075F	DB	$1F, $00
+
+; ----------------------------------------
+
+; IVT z 2 vnosoma za ???, ki kazxeta na rutino spodaj, ko je prekopirana.
+
+0761	DW	$C004, $C004
+
+; ----------------------------------------
+
+; Rutina za ???, ki se prekopira na C000 skupaj z zgornjim IVT.
+
+0765	DI
+0766	LD	A,#03
+0768	OUT	(#C8),A
+076A	OUT	(#C9),A
+076C	OUT	(#88),A
+076E	LD	HL,#2000
+0771	LD	DE,#0000
+0774	LD	BC,#0800
+0777	LDIR
+0779	LD	HL,#02E8
+077C	LD	A,L
+077D	OUT	(#E8),A
+077F	OUT	(#C8),A
+0781	LD	A,H
+0782	LD	I,A
+0784	EI
+0785	CALL	IzvediRETI
+0788	LD	HL,#078E
+078B	JP	IzpisiPrelomInNiz
+
+; ----------------------------------------
+
+; Sporocxilo o napaki pri nalaganju s trdega diska, ki se nikoli ne izpisxe?
+
+078E	DB	$11, $00
+0790	DZ	"LOADING ERROR FROM HARD DISK TRY TO LOAD SYSTEM FROM FLOPPY "
+
+; ----------------------------------------
+
+; Konec, nicx vecx zanimivega
+
+07CD	DB	$FF
+07CE	DS	50, $1A
+
+; ----------------------------------------
+
+;; F600: Trampolin
+;; E000: CPMLDR
+;; FFEB: Scroll
+;; FFD0: Neznano1
+;; FFD1: Neznano2
+;; FFD2: Neznano3
+;; FFD4: Neznano4
+;; FFD5: Neznano5
+;; FFD7: Neznano6
+;; FFD8: Neznano7
