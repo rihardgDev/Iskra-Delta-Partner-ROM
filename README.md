@@ -5,7 +5,7 @@ Dumps and disassembly of Iskra Delta Partner ROMS, Slovenian computer from the 8
 This folder contains three different OS ROMS, for 1FG, WFG models of the computer and one, that has altered boot screen.
 
 # unknown ROMs
-This folder contains presumably the character ROMS, but this is still unconfirmed if you know more about it please let me know.
+This folder contains presumably the character ROMS, but this is still unconfirmed if you know more about it please let me know. Character ROMS were in Character set: YUSCII. 
 
 OS ROMs have also been dissasembled and the code has been commented (in slovene).
 
