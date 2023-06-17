@@ -1,4 +1,4 @@
-# Iskra-Delta-Partner-ROM
+# Iskra-Delta-Partner
 Dumps and disassembly of Iskra Delta Partner ROMS, Slovenian computer from the 80'
 
 # OS ROMs
